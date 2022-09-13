@@ -1,37 +1,42 @@
 package main
 
 import (
-	"errors"
+	"bytes"
+	"encoding/json"
 	"fmt"
-	"io"
+	"log"
 	"net/http"
-	"os"
 )
 
 func getOrder(w http.ResponseWriter, r *http.Request) {
 
-	if r.URL.Path != "/" {
+	if r.URL.Path != "/order" {
 		http.Error(w, "404 not found.", http.StatusNotFound)
 		return
 	}
 
-	if r.Method != "GET" {
+	if r.Method != "POST" {
 		http.Error(w, "Method is not supported.", http.StatusNotFound)
 		return
 	}
 
-	fmt.Printf("got / request\n")
-	io.WriteString(w, "This is my website!\n")
+	fmt.Printf("got /order request\n")
+
+	postBody, _ := json.Marshal(map[string]string{
+		"name":  "Toby",
+		"email": "Toby@example.com",
+	})
+	responseBody := bytes.NewBuffer(postBody)
+
+	http.Post("http://dinninghall:8020/distribution", "application/json", responseBody)
+
 }
 
 func main() {
-	http.HandleFunc("/", getOrder)
-	err := http.ListenAndServe(":8010", nil)
+	http.HandleFunc("/order", getOrder)
 
-	if errors.Is(err, http.ErrServerClosed) {
-		fmt.Printf("Server closed \n")
-	} else if err != nil {
-		fmt.Printf("Error starting server: %s \n", err)
-		os.Exit(1)
+	fmt.Printf("Server Kitchen started on PORT 8010\n")
+	if err := http.ListenAndServe(":8010", nil); err != nil {
+		log.Fatal(err)
 	}
 }
