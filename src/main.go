@@ -1,12 +1,14 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 )
+
+const TIMEUNIT int = 200
 
 func getOrder(w http.ResponseWriter, r *http.Request) {
 
@@ -20,20 +22,33 @@ func getOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Printf("got /order request\n")
+	var order Order
+	json.NewDecoder(r.Body).Decode(&order)
+	fmt.Printf("%v\n\n", order)
+	order.CookingTime = time.Now().UnixMilli()
+	ordersMap.Store(order.Id, order)
 
-	postBody, _ := json.Marshal(map[string]string{
-		"name":  "Toby",
-		"email": "Toby@example.com",
-	})
-	responseBody := bytes.NewBuffer(postBody)
-
-	http.Post("http://dinninghall:8020/distribution", "application/json", responseBody)
+	for i := 0; i < len(order.Items); i++ {
+		jobsRank[menu[order.Items[i]-1].Complexity-1] <- OrderFood{OrderId: order.Id, FoodId: order.Items[i]}
+	}
 
 }
 
 func main() {
 	http.HandleFunc("/order", getOrder)
+
+	ParseMenu()
+	ParseCooks()
+
+	InitCookRankChs()
+
+	go HandleDoneJobs()
+
+	for i := 0; i < len(cooks); i++ {
+		for j := 0; j < cooks[i].Proficiency; j++ {
+			go HandleCook(i, cooks[i].Rank)
+		}
+	}
 
 	fmt.Printf("Server Kitchen started on PORT 8010\n")
 	if err := http.ListenAndServe(":8010", nil); err != nil {
